@@ -1,24 +1,5 @@
-# starknet-signing
+# From secp256k1 to STARK-Friendly Curves: Exploring ECDSA in Ethereum and Starknet
 
-To install dependencies:
-
-```bash
-bun install
-```
-
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.1.27. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
-
-
-
-
-
-## Introduction
 Elliptic Curve Digital Signature Algorithm (ECDSA) is a fundamental building block for secure transactions on blockchains. While Ethereum and Starknet both rely on ECDSA, they implement it using different elliptic curves, account models, and verification methods.
 
 Think of it like two bank branches that share the same principles of checking signatures, yet each uses a slightly different machine to verify them. Both branches still rely on your personal signature to confirm you’re the account owner, but the behind-the-scenes verification differs.
@@ -58,52 +39,54 @@ How Starknet Adapts ECDSA
 
 ## The Math Behind the Stark Curve
 
-When we say “Starknet uses a STARK-friendly elliptic curve,” we’re referring to a curve whose parameters (prime field, curve equation, and group order) are chosen to be efficient within STARK-based zero-knowledge proofs. Ethereum’s `secp256k1`, by contrast, is geared toward efficient ECDSA verification on CPU architectures and has been widely adopted by Bitcoin and other blockchains.
+When we say “Starknet uses a STARK-friendly elliptic curve,” we’re referring to a curve whose parameters (prime field, curve equation, and group order) are chosen to work efficiently in STARK-based zero-knowledge proofs. Ethereum’s `secp256k1`, by contrast, is optimized for CPU-based ECDSA verification and is widely adopted (e.g., Bitcoin, Ethereum).
 
 ### Ethereum’s secp256k1 Curve
-- **Type**: A Koblitz curve defined by the equation:  
-  \[
-    y^2 \equiv x^3 + 7 \pmod{p}
-  \]  
-- **Prime** (\( p \)): \( 2^{256} - 2^{32} - 977 \)  
-- **Group Order** (\( n \)): \( \approx 1.158 \times 10^{77} \)  
-- **Motivation**: Designed for efficient scalar multiplication on CPUs (key for signature verification). It wasn’t explicitly chosen for zero-knowledge proof systems, but rather for fast ECDSA and broad industry adoption.
+- **Type**: A Koblitz curve defined by the equation:
+  ```
+  y^2 = x^3 + 7   (mod p)
+  ```
+- **Prime** (`p`): `2^256 - 2^32 - 977`
+- **Group Order** (`n`): approximately `1.158 × 10^77`
+- **Motivation**: Designed for efficient scalar multiplication on CPUs (key for signature verification). It was not specifically chosen for zero-knowledge proofs, but rather for broad adoption in mainstream crypto applications.
 
 ### Starknet’s STARK-Friendly Curve
-Starknet uses an elliptic curve defined over a large prime field close to \(2^{251}\). You’ll often see references to this curve in the Pedersen hashing process. The high-level math is similar (still \(y^2 = x^3 + Ax + B\)), but the choice of \(p\), \(A\), and \(B\) is specialized for STARK proofs.
+Starknet uses an elliptic curve defined over a large prime field near `2^251`. You’ll often see references to it in the Pedersen hashing process. The high-level math is similar—still `y^2 = x^3 + A x + B`—but the choice of `p`, `A`, and `B` is specialized for STARK proofs.
 
-- **Type**: A Weierstrass form curve, typically expressed as:  
-  \[
-    y^2 \equiv x^3 + Ax + B \pmod{p}
-  \]
-- **Prime** (\( p \)): Approximately \(2^{251}\), ensuring efficient operations in STARK circuits.
-- **Group Order** (\( n \)): Also on the order of \(2^{251}\), large enough to protect against discrete log attacks.
-- **Motivation**: This prime is “friendly” for STARKs because it simplifies the circuitry for proof generation. Arithmetic operations (like exponentiations and point multiplications) can be done with fewer constraints, making proofs faster and cheaper.
+- **Type**: A Weierstrass form curve, typically expressed as:
+  ```
+  y^2 = x^3 + A x + B   (mod p)
+  ```
+- **Prime** (`p`): approximately `2^251`, ensuring efficient operations in STARK circuits.
+- **Group Order** (`n`): also on the order of `2^251`, large enough to protect against discrete log attacks.
+- **Motivation**: The prime is chosen to be “friendly” for STARK-based zero-knowledge proofs, meaning it simplifies the arithmetic within the proof circuits. Fewer constraints lead to more efficient proof generation.
 
 ### Why “STARK-Friendly” Matters
-In a STARK-based system, you frequently need to prove knowledge of signatures or hashed data inside a zero-knowledge circuit. Curves like `secp256k1` can be used in ZK proofs, but require more overhead:
-1. **Prime Field Mismatch**: STARK systems operate in a specific “native field.” If `secp256k1`’s prime doesn’t match this field, you need extra logic in the proof circuit.
-2. **Complex Curve Equations**: Every arithmetic step adds constraints. A curve fine-tuned to the STARK field reduces these constraints and boosts performance.
+In a STARK-based system, you often need to prove knowledge of signatures or hashed data within a zero-knowledge circuit. Curves like `secp256k1` can be used in zero-knowledge proofs, but they introduce more overhead:
 
-By using a curve that aligns with the native STARK field, Starknet can validate signatures and Pedersen hashes with reduced complexity. This leads to more efficient proof generation and verification—core features of a zero-knowledge-oriented blockchain.
+1. **Prime Field Mismatch**: STARK systems use a specific “native field.” If `secp256k1`’s prime doesn’t match that field, you need to add extra logic or conversions.
+2. **Complex Curve Equations**: Every arithmetic step in your proof adds constraints. A curve that fits neatly into the STARK-native field reduces those constraints and speeds up proofs.
+
+By using a curve that aligns with the native STARK field, Starknet can validate signatures and Pedersen hashes with far less complexity in the proof circuits. This means faster, cheaper proof generation and verification—critical for a zero-knowledge-oriented blockchain.
 
 ### Comparing the Two Curves
 1. **Field Size**  
-   - **secp256k1**: \(p \approx 2^{256}\)  
-   - **Stark Curve**: \(p \approx 2^{251}\)  
-   Though similar in magnitude, the Stark curve’s prime is deliberately chosen for STARK circuits.
+   - **secp256k1**: `p ≈ 2^256`  
+   - **Stark Curve**: `p ≈ 2^251`  
+   Though both are large, the Stark curve’s prime is deliberately chosen to match STARK circuits.
 
 2. **Curve Equation**  
-   - Both use a Weierstrass form, but each has distinct constants \(A\) and \(B\).
+   - Both use a Weierstrass form, but each has distinct constants for `A` and `B`.
 
 3. **Group Order & Security**  
-   - Both define large prime-order subgroups, ensuring security against discrete log attacks.  
-   
-4. **Performance Goals**  
-   - **secp256k1**: Popular for CPU-based ECDSA, widely supported.  
-   - **Stark Curve**: Zero-knowledge circuit-friendly, enabling faster, cheaper STARK proofs.
+   - Both define large prime-order subgroups to prevent discrete log attacks.
 
-Ultimately, the signing and verification steps remain conceptually the same—hash your data, generate \((r, s)\), and verify with your public key. The difference lies in the underlying parameters, which make Starknet’s curve more efficient in a STARK-proven environment. 
+4. **Performance Goals**  
+   - **secp256k1**: Ideal for CPU-based ECDSA, widely supported in existing libraries.  
+   - **Stark Curve**: Ideal for zero-knowledge proof systems—faster, cheaper proving in STARK environments.
+
+Conceptually, the ECDSA steps (hashing data, generating `(r, s)`, verifying signatures) remain the same on both Ethereum and Starknet. The critical difference is the choice of curve parameters under the hood, which makes Starknet’s curve more amenable to zero-knowledge computations.
+
 
 
 ## Differences Between Starknet and Ethereum
@@ -139,7 +122,7 @@ Important Considerations:
 
 The Starknet.js library lets you sign messages in several ways: using simple arrays of numbers, structured data (EIP-712), or even an Ethereum-style signer. These examples show how to sign and verify both off-chain and on-chain.
 
-1) End-to-End Script: Generate Key, Sign, and Verify
+### End-to-End Script: Generate Key, Sign, and Verify
 Below is a complete script that you can run in this repository to verify that your local environment is set up correctly. This script does the following:
 
 1. Generates or uses an existing private key.
@@ -184,48 +167,208 @@ main().catch((err) => {
 
 If you’ve used Ethereum’s secp256k1 curve, you’ll notice that signing and verifying are conceptually similar—only the curve and hashing function differ.
 
+### Advanced: EIP-712 Typed Data and On-Chain Verification
 
+Sometimes you need to sign structured data—for instance, a game might want to verify that a user purchased certain items, or a DApp might require multiple typed fields. Starknet provides an EIP-712-like system for typed data, which you can sign off-chain and optionally verify on-chain.
 
+Here’s a script that:
 
-1. Sign and Send a Basic Message (Array of Numbers)
+1. Connects to the local devnet.
+2. Uses a real devnet account (with an address and private key).
+3. Creates an EIP-712 style typedData object.
+4. Naively hashes that data with starknetKeccak(JSON.stringify(typedData)) and signs it (just for demonstration).
+5. Verifies the signature off-chain using the uncompressed public key.
+6. Calls the account’s isValidSignature method on-chain—this typically requires the signature array to include its length (a common source of errors).
+
+> Warning: In a production dApp, you should rely on official typed-data hashing (e.g., `account.signMessage(typedData)`), which ensures the on-chain contract recognizes the signature.
 
 ```ts
-import { ec, hash, num, encode, WeierstrassSignatureType } from 'starknet';
+// signAndVerifyAdvanced.ts
 
-const privateKey = '0x1234567890987654321';
-const starknetPublicKey = ec.starkCurve.getStarkKey(privateKey);
-const fullPublicKey = encode.addHexPrefix(
-  encode.buf2hex(ec.starkCurve.getPublicKey(privateKey, false))
-);
+import {
+  ec,
+  hash,
+  encode,
+  shortString,
+  Account,
+  RpcProvider,
+  TypedData,
+  WeierstrassSignatureType,
+} from 'starknet';
 
-// Suppose your message is an array of BigNumberish
-const message = [1, 128, 18, 14];
+async function main() {
+  // ---------------------------
+  // 1) Connect to Devnet
+  // ---------------------------
+  const provider = new RpcProvider({ nodeUrl: 'http://127.0.0.1:5050/rpc' });
+  try {
+    // Check if devnet is responding
+    const latestBlock = await provider.getBlock('latest');
+    console.log('✅ Successfully connected to devnet!');
+    console.log(`Latest block #${latestBlock.block_number} | Hash: ${latestBlock.block_hash}`);
+  } catch (err) {
+    console.error('❌ Could not connect to devnet. Is it running? Error:', err);
+    process.exit(1);
+  }
 
-// Step 1: Compute the hash
-const msgHash = hash.computeHashOnElements(message);
+  // ---------------------------
+  // 2) Use Your Devnet Account
+  // ---------------------------
+  // Replace with your actual devnet account address & private key
+  // (Provided example from devnet account #0)
+  const privateKey =
+    '0x00000000000000000000000000000000c10662b7b247c7cecf7e8a30726cff12';
+  const accountAddress =
+    '0x0260a8311b4f1092db620b923e8d7d20e76dedcc615fb4b6fdf28315b81de201';
 
-// Step 2: Sign the message
-const signature: WeierstrassSignatureType = ec.starkCurve.sign(msgHash, privateKey);
+  // Create an Account instance that can sign & send transactions
+  const account = new Account(provider, accountAddress, privateKey);
 
-// Now you can send (off-chain) to a recipient:
-// - The message
-// - The signature
-// - The full public key (or the account address that uses this private key)
+  // ---------------------------
+  // 3) Generate Uncompressed Public Key
+  // ---------------------------
+  // Devnet only shows you the X coordinate (shortPublicKey).
+  // Since you have the private key, you can compute the full "0x04 + X + Y":
+  const fullPublicKey = encode.addHexPrefix(
+    encode.buf2hex(ec.starkCurve.getPublicKey(privateKey, false))
+  );
+  console.log('Full uncompressed public key =', fullPublicKey);
+
+  // ---------------------------
+  // 4) Define a Complex EIP-712 TypedData
+  // ---------------------------
+  // We'll sign a "PurchaseOrder" that has an ID, buyer, array of items, etc.
+  const typedData: TypedData = {
+    types: {
+      StarkNetDomain: [
+        { name: 'name', type: 'string' },
+        { name: 'version', type: 'felt' },
+        { name: 'chainId', type: 'felt' },
+      ],
+      PurchaseOrder: [
+        { name: 'orderId', type: 'felt' },
+        { name: 'buyer', type: 'felt' },
+        { name: 'items', type: 'felt*' },
+        { name: 'memo', type: 'string' },
+      ],
+    },
+    primaryType: 'PurchaseOrder',
+    domain: {
+      name: 'MyNftGame',
+      version: '1',
+      chainId: shortString.encodeShortString('SN_LOCAL'), // typical devnet chain name
+    },
+    message: {
+      orderId: '0x123abc',
+      buyer: accountAddress,
+      items: ['0x01', '0x02', '0x03'],
+      memo: 'Thank you for your order!',
+    },
+  };
+
+  console.log('\nSigning EIP-712 typed data with private key...');
+
+  // ---------------------------
+  // 5) Hash & Sign (Naive Approach)
+  // ---------------------------
+  // Real EIP-712 in Starknet is more involved. For demonstration:
+  const typedDataHashBigInt = hash.starknetKeccak(JSON.stringify(typedData));
+  const typedDataHashHex = '0x' + typedDataHashBigInt.toString(16);
+  console.log('Typed data hash (hex) =', typedDataHashHex);
+
+  // Produce an off-chain signature using starkCurve
+  const signatureEIP712: WeierstrassSignatureType = ec.starkCurve.sign(
+    typedDataHashHex,
+    privateKey
+  );
+  console.log('Signature (r, s) =', signatureEIP712);
+
+  // ---------------------------
+  // 6) Off-chain Verification
+  // ---------------------------
+  const resultOffChain = ec.starkCurve.verify(signatureEIP712, typedDataHashHex, fullPublicKey);
+  console.log('\nOff-chain verification result =', resultOffChain);
+
+  // ---------------------------
+  // 7) On-chain Verification
+  // ---------------------------
+  // We'll call isValidSignature on the devnet account contract.
+  // NOTE: The contract expects "hash, signature_len, signature[0], signature[1], ..."
+  // So we must provide the signature array length before r & s.
+  const { r, s } = signatureEIP712;
+  const rHex = '0x' + r.toString(16);
+  const sHex = '0x' + s.toString(16);
+
+  try {
+    await account.execute({
+      contractAddress: accountAddress,
+      entrypoint: 'isValidSignature',
+      calldata: [
+        typedDataHashHex, // hash
+        '2',              // length of signature array (two felts)
+        rHex,             // signature[0]
+        sHex,             // signature[1]
+      ],
+    });
+    console.log('On-chain verification result = true');
+  } catch (err) {
+    console.log('On-chain verification failed:', err);
+  }
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
 ```
 
+#### Tips & Warnings
+1. **Param #2 Must Be the Signature Array Length**
+In Cairo, a function parameter typed as `felt*` must begin with the length of the array. If you pass just `[hash, rHex, sHex]`, you’ll see `“Failed to deserialize param #2”`. Instead, do `[hash, '2', rHex, sHex]`.
 
+2. **Hash Mismatch**
+Most OpenZeppelin-based accounts expect a standard EIP-712 hashing approach (structured domain + typed data → pedersen hash). If you see an on-chain revert despite correct parameters, it may be because you used `starknetKeccak(JSON.stringify(...))`
+Recommendation: Use `account.signMessage(typedData)` for automatic hashing that the contract recognizes.
 
+3. **Keep Private Keys Secure**
+This example is for local devnet usage. In production, store private keys in environment variables or secure vaults.
 
+4. **Update devnet**
+If you see “Method not found” or “Failed to estimate fee,” ensure you have a recent version of `starknet-devnet`.
 
+### Putting It All Together
+
+You now have two examples:
+
+* Simple array signing: A quick introduction to hashing & signing.
+* Advanced EIP-712: Demonstrates structured data, naive hashing, off-chain & on-chain checks.
+
+In real-world projects, you’ll rely on the official EIP-712 hashing logic or `account.signMessage(typedData)` so that your on-chain account recognizes the signature. Nonetheless, this advanced sample gives you insight into the raw `ec.starkCurve.sign` call and how you might manually pass parameters for `isValidSignature`.
+
+> Final Note: The differences between `secp256k1` (Ethereum) and Stark-friendly curves (Starknet) are behind the scenes. The higher-level signing steps and verification calls remain conceptually similar—only the library, hash function, and underlying prime field change. This is how Starknet combines the familiarity of ECDSA with the power of zero-knowledge-friendly cryptography.
 
 ## Conclusion
 While Ethereum and Starknet both use ECDSA to verify transactions, Starknet’s approach opens the door to more flexible and future-proof cryptography. Account abstraction, in particular, means you can upgrade your security model over time. Whether you’re signing with Starknet.js or starknet.py, the goal remains the same: ensure that only the rightful vault owner (private key holder) can sign a transaction.
 
 Remember our analogy: no one else can sneak into your vault or copy your keycard, and your unique signature (r, s) proves you’re the legitimate owner. As blockchain technology continues to evolve, Starknet’s specialized curve and account abstraction lay the groundwork for advanced authentication and quantum-safe cryptography—ensuring your digital vault remains secure for years to come.
 
-Further Reading
+## Further Reading
 
 Starknet.js Documentation
 starknet.py Documentation
 EIP-712 Specification
 SRC-6 Standard for Starknet
+
+To install dependencies:
+
+```bash
+bun install
+```
+
+To run:
+
+```bash
+bun run index.ts
+```
+
+This project was created using `bun init` in bun v1.1.27. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
