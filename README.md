@@ -56,6 +56,56 @@ How Starknet Adapts ECDSA
 * Account Abstraction: Every user account on Starknet is a smart contract. This allows you to customize verification logic or add extra security steps.
 * Flexible Verification: Because each account is a contract, you can upgrade or change how signatures are verified. This is especially powerful for multi-factor or quantum-resistant schemes.
 
+## The Math Behind the Stark Curve
+
+When we say “Starknet uses a STARK-friendly elliptic curve,” we’re referring to a curve whose parameters (prime field, curve equation, and group order) are chosen to be efficient within STARK-based zero-knowledge proofs. Ethereum’s `secp256k1`, by contrast, is geared toward efficient ECDSA verification on CPU architectures and has been widely adopted by Bitcoin and other blockchains.
+
+### Ethereum’s secp256k1 Curve
+- **Type**: A Koblitz curve defined by the equation:  
+  \[
+    y^2 \equiv x^3 + 7 \pmod{p}
+  \]  
+- **Prime** (\( p \)): \( 2^{256} - 2^{32} - 977 \)  
+- **Group Order** (\( n \)): \( \approx 1.158 \times 10^{77} \)  
+- **Motivation**: Designed for efficient scalar multiplication on CPUs (key for signature verification). It wasn’t explicitly chosen for zero-knowledge proof systems, but rather for fast ECDSA and broad industry adoption.
+
+### Starknet’s STARK-Friendly Curve
+Starknet uses an elliptic curve defined over a large prime field close to \(2^{251}\). You’ll often see references to this curve in the Pedersen hashing process. The high-level math is similar (still \(y^2 = x^3 + Ax + B\)), but the choice of \(p\), \(A\), and \(B\) is specialized for STARK proofs.
+
+- **Type**: A Weierstrass form curve, typically expressed as:  
+  \[
+    y^2 \equiv x^3 + Ax + B \pmod{p}
+  \]
+- **Prime** (\( p \)): Approximately \(2^{251}\), ensuring efficient operations in STARK circuits.
+- **Group Order** (\( n \)): Also on the order of \(2^{251}\), large enough to protect against discrete log attacks.
+- **Motivation**: This prime is “friendly” for STARKs because it simplifies the circuitry for proof generation. Arithmetic operations (like exponentiations and point multiplications) can be done with fewer constraints, making proofs faster and cheaper.
+
+### Why “STARK-Friendly” Matters
+In a STARK-based system, you frequently need to prove knowledge of signatures or hashed data inside a zero-knowledge circuit. Curves like `secp256k1` can be used in ZK proofs, but require more overhead:
+1. **Prime Field Mismatch**: STARK systems operate in a specific “native field.” If `secp256k1`’s prime doesn’t match this field, you need extra logic in the proof circuit.
+2. **Complex Curve Equations**: Every arithmetic step adds constraints. A curve fine-tuned to the STARK field reduces these constraints and boosts performance.
+
+By using a curve that aligns with the native STARK field, Starknet can validate signatures and Pedersen hashes with reduced complexity. This leads to more efficient proof generation and verification—core features of a zero-knowledge-oriented blockchain.
+
+### Comparing the Two Curves
+1. **Field Size**  
+   - **secp256k1**: \(p \approx 2^{256}\)  
+   - **Stark Curve**: \(p \approx 2^{251}\)  
+   Though similar in magnitude, the Stark curve’s prime is deliberately chosen for STARK circuits.
+
+2. **Curve Equation**  
+   - Both use a Weierstrass form, but each has distinct constants \(A\) and \(B\).
+
+3. **Group Order & Security**  
+   - Both define large prime-order subgroups, ensuring security against discrete log attacks.  
+   
+4. **Performance Goals**  
+   - **secp256k1**: Popular for CPU-based ECDSA, widely supported.  
+   - **Stark Curve**: Zero-knowledge circuit-friendly, enabling faster, cheaper STARK proofs.
+
+Ultimately, the signing and verification steps remain conceptually the same—hash your data, generate \((r, s)\), and verify with your public key. The difference lies in the underlying parameters, which make Starknet’s curve more efficient in a STARK-proven environment. 
+
+
 ## Differences Between Starknet and Ethereum
 
 | **Aspect**           | **Starknet**                                                                                         | **Ethereum**                                                                  |
