@@ -1,0 +1,19 @@
+{
+  "name": "starknet-signing",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "sign-verify": "bun run src/scripts/signAndVerify.ts",
+    "sign-verify-advanced": "bun run src/scripts/signAndVerifyAdvanced.ts",
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "starknet": "^6.11.0"
+  }
+}
