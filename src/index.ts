@@ -17,4 +17,4 @@ console.log(`
        - Demonstrates signing with an Ethereum signer.
   
   Please run each command to see the example in action.
-  `);  
+  `);
