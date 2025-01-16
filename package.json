@@ -6,6 +6,7 @@
     "start": "bun run src/index.ts",
     "sign-verify": "bun run src/scripts/signAndVerify.ts",
     "sign-verify-advanced": "bun run src/scripts/signAndVerifyAdvanced.ts",
+    "sign-ethereum": "bun run src/scripts/signWithEthereum.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
@@ -14,6 +15,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "ethers": "^6.13.5",
     "starknet": "^6.11.0"
   }
 }

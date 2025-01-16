@@ -1,13 +1,16 @@
 # From secp256k1 to STARK-Friendly Curves: Exploring ECDSA in Ethereum and Starknet
 
-Elliptic Curve Digital Signature Algorithm (ECDSA) is a fundamental building block for secure transactions on blockchains. While Ethereum and Starknet both rely on ECDSA, they implement it using different elliptic curves, account models, and verification methods.
+Elliptic Curve Digital Signature Algorithm (ECDSA) is a fundamental building block for secure transactions on blockchains. Ethereum and Starknet both rely on ECDSA but use different elliptic curves, hashing functions, and account models under the hood. Think of it like two bank branches that both check your signature—each branch might use a slightly different verification machine, but they both confirm that only you can sign transactions for your account.
 
-Think of it like two bank branches that share the same principles of checking signatures, yet each uses a slightly different machine to verify them. Both branches still rely on your personal signature to confirm you’re the account owner, but the behind-the-scenes verification differs.
+In this post, we’ll:
 
-In this post, we’ll explain ECDSA’s basics, how Ethereum does it, and then how Starknet adapts ECDSA to suit its zero-knowledge-friendly environment.
+1. Recap ECDSA essentials.
+2. Discuss how Ethereum implements ECDSA on the `secp256k1` curve.
+3. Explore how Starknet adapts ECDSA to be “STARK-friendly.”
+4. Compare the two approaches and look at practical code examples.
+5. Show how to run all the examples using Bun.
 
 ## ECDSA in a Nutshell
-
 ECDSA (Elliptic Curve Digital Signature Algorithm) is a method for creating digital signatures using elliptic-curve cryptography.
 
 Key points:
@@ -120,41 +123,90 @@ Important Considerations:
 
 ## Practical Examples in Starknet.js
 
-The Starknet.js library lets you sign messages in several ways: using simple arrays of numbers, structured data (EIP-712), or even an Ethereum-style signer. These examples show how to sign and verify both off-chain and on-chain.
+The Starknet.js library lets you sign messages in several ways: using simple arrays of numbers, structured data (EIP-712), or even an Ethereum-style signer.
 
-### End-to-End Script: Generate Key, Sign, and Verify
-Below is a complete script that you can run in this repository to verify that your local environment is set up correctly. This script does the following:
+Below, we’ll highlight two main scripts you can run. Both scripts assume you have a [Starknet devnet running](https://0xspaceshard.github.io/starknet-devnet-rs/docs/running/install), along with Bun installed for dependency management and script execution.
 
-1. Generates or uses an existing private key.
-2. Derives the corresponding public key.
-3. Creates a simple message and computes its hash using Starknet’s Pedersen hash.
-4. Signs the hash with Starknet ECDSA, producing { r, s }.
-5. Verifies the signature with the uncompressed public key.
+Start by cloning the tutorial repository to your local machine:
+
+```bash
+git clone https://github.com/omarespejel/starknet-signing-tutorial.git
+cd starknet-signing-tutorial
+```
+
+Install Bun (if not already) ([docs here](https://bun.sh/)):
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+Install Dependencies:
+```bash
+bun install
+```
+
+Run the Scripts (from the repo root):
+
+* Basic Sign & Verify:
+
+```bash
+bun run sign-verify
+```
+This runs `src/scripts/signAndVerify.ts`.
+
+
+Advanced EIP-712:
+```bash
+bun run sign-verify-advanced
+```
+This runs `src/scripts/signAndVerifyAdvanced.ts`.
+
+The scripts in the package.json look like this:
+
+```jsonc
+{
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "sign-verify": "bun run src/scripts/signAndVerify.ts",
+    "sign-verify-advanced": "bun run src/scripts/signAndVerifyAdvanced.ts",
+    "sign-ethereum": "bun run src/scripts/signWithEthereum.ts"
+  }
+}
+```
+
+### `signAndVerify.ts`
+
+A simple demonstration of:
+
+* Generating a private key (or using an existing one).
+* Deriving the public key.
+* Hashing a basic message with Pedersen.
+* Signing and verifying the signature off-chain.
 
 ```ts
+// signAndVerify.ts
 import { ec, hash, encode } from 'starknet';
 
 async function main() {
-  // 1) Generate or have a private key
-  const privateKey = '0x1234567890987654321'; // Example only, use secure storage in production!
+  // 1) Use or generate a private key
+  const privateKey = '0x1234567890987654321';
 
-  // 2) Compute the Starknet public key in hex format (0x04 + X + Y)
+  // 2) Get the uncompressed public key
   const fullPublicKey = encode.addHexPrefix(
     encode.buf2hex(ec.starkCurve.getPublicKey(privateKey, false))
   );
   console.log('Full public key =', fullPublicKey);
 
-  // 3) Define a message as BigNumberish[] and compute its hash as a hex string
+  // 3) Hash the message
   const message = [1, 128, 18, 14];
   const msgHash = hash.computeHashOnElements(message);
-  console.log('Message hash =', msgHash); // "0x..." in hex
+  console.log('Message hash =', msgHash);
 
-  // 4) Sign the hash using ec.starkCurve.sign (returns { r: "0x..", s: "0x.." })
+  // 4) Sign the hash
   const signature = ec.starkCurve.sign(msgHash, privateKey);
   console.log('Signature =', signature);
 
   // 5) Verify the signature
-  // ec.starkCurve.verify({ r, s }, msgHash, fullPublicKey)
   const isValid = ec.starkCurve.verify(signature, msgHash, fullPublicKey);
   console.log('Signature is valid?', isValid);
 }
@@ -167,24 +219,21 @@ main().catch((err) => {
 
 If you’ve used Ethereum’s secp256k1 curve, you’ll notice that signing and verifying are conceptually similar—only the curve and hashing function differ.
 
-### Advanced: EIP-712 Typed Data and On-Chain Verification
+### `signAndVerifyAdvanced.ts`
 
 Sometimes you need to sign structured data—for instance, a game might want to verify that a user purchased certain items, or a DApp might require multiple typed fields. Starknet provides an EIP-712-like system for typed data, which you can sign off-chain and optionally verify on-chain.
 
-Here’s a script that:
+Demonstrates:
 
-1. Connects to the local devnet.
-2. Uses a real devnet account (with an address and private key).
-3. Creates an EIP-712 style typedData object.
-4. Naively hashes that data with starknetKeccak(JSON.stringify(typedData)) and signs it (just for demonstration).
-5. Verifies the signature off-chain using the uncompressed public key.
-6. Calls the account’s isValidSignature method on-chain—this typically requires the signature array to include its length (a common source of errors).
+* Connecting to a local devnet.
+* Using a real devnet account.
+* Crafting EIP-712-style typed data.
+* Signing it, verifying off-chain, and verifying on-chain via the account’s isValidSignature method.
 
 > Warning: In a production dApp, you should rely on official typed-data hashing (e.g., `account.signMessage(typedData)`), which ensures the on-chain contract recognizes the signature.
 
 ```ts
 // signAndVerifyAdvanced.ts
-
 import {
   ec,
   hash,
@@ -197,47 +246,26 @@ import {
 } from 'starknet';
 
 async function main() {
-  // ---------------------------
-  // 1) Connect to Devnet
-  // ---------------------------
+  // 1) Connect to devnet
   const provider = new RpcProvider({ nodeUrl: 'http://127.0.0.1:5050/rpc' });
-  try {
-    // Check if devnet is responding
-    const latestBlock = await provider.getBlock('latest');
-    console.log('✅ Successfully connected to devnet!');
-    console.log(`Latest block #${latestBlock.block_number} | Hash: ${latestBlock.block_hash}`);
-  } catch (err) {
-    console.error('❌ Could not connect to devnet. Is it running? Error:', err);
-    process.exit(1);
-  }
+  const latestBlock = await provider.getBlock('latest');
+  console.log('✅ Connected to devnet!');
+  console.log(`Latest block #${latestBlock.block_number} | Hash: ${latestBlock.block_hash}`);
 
-  // ---------------------------
-  // 2) Use Your Devnet Account
-  // ---------------------------
-  // Replace with your actual devnet account address & private key
-  // (Provided example from devnet account #0)
+  // 2) Use your devnet account
   const privateKey =
     '0x00000000000000000000000000000000c10662b7b247c7cecf7e8a30726cff12';
   const accountAddress =
     '0x0260a8311b4f1092db620b923e8d7d20e76dedcc615fb4b6fdf28315b81de201';
-
-  // Create an Account instance that can sign & send transactions
   const account = new Account(provider, accountAddress, privateKey);
 
-  // ---------------------------
-  // 3) Generate Uncompressed Public Key
-  // ---------------------------
-  // Devnet only shows you the X coordinate (shortPublicKey).
-  // Since you have the private key, you can compute the full "0x04 + X + Y":
+  // 3) Generate uncompressed public key
   const fullPublicKey = encode.addHexPrefix(
     encode.buf2hex(ec.starkCurve.getPublicKey(privateKey, false))
   );
   console.log('Full uncompressed public key =', fullPublicKey);
 
-  // ---------------------------
-  // 4) Define a Complex EIP-712 TypedData
-  // ---------------------------
-  // We'll sign a "PurchaseOrder" that has an ID, buyer, array of items, etc.
+  // 4) Define EIP-712 typed data
   const typedData: TypedData = {
     types: {
       StarkNetDomain: [
@@ -256,7 +284,7 @@ async function main() {
     domain: {
       name: 'MyNftGame',
       version: '1',
-      chainId: shortString.encodeShortString('SN_LOCAL'), // typical devnet chain name
+      chainId: shortString.encodeShortString('SN_LOCAL'),
     },
     message: {
       orderId: '0x123abc',
@@ -266,48 +294,34 @@ async function main() {
     },
   };
 
-  console.log('\nSigning EIP-712 typed data with private key...');
+  console.log('\nSigning EIP-712 typed data...');
 
-  // ---------------------------
-  // 5) Hash & Sign (Naive Approach)
-  // ---------------------------
-  // Real EIP-712 in Starknet is more involved. For demonstration:
+  // 5) Naive hash & sign
   const typedDataHashBigInt = hash.starknetKeccak(JSON.stringify(typedData));
   const typedDataHashHex = '0x' + typedDataHashBigInt.toString(16);
   console.log('Typed data hash (hex) =', typedDataHashHex);
 
-  // Produce an off-chain signature using starkCurve
   const signatureEIP712: WeierstrassSignatureType = ec.starkCurve.sign(
     typedDataHashHex,
     privateKey
   );
   console.log('Signature (r, s) =', signatureEIP712);
 
-  // ---------------------------
-  // 6) Off-chain Verification
-  // ---------------------------
+  // 6) Off-chain verification
   const resultOffChain = ec.starkCurve.verify(signatureEIP712, typedDataHashHex, fullPublicKey);
-  console.log('\nOff-chain verification result =', resultOffChain);
+  console.log('Off-chain verification result =', resultOffChain);
 
-  // ---------------------------
-  // 7) On-chain Verification
-  // ---------------------------
-  // We'll call isValidSignature on the devnet account contract.
-  // NOTE: The contract expects "hash, signature_len, signature[0], signature[1], ..."
-  // So we must provide the signature array length before r & s.
+  // 7) On-chain verification
   const { r, s } = signatureEIP712;
-  const rHex = '0x' + r.toString(16);
-  const sHex = '0x' + s.toString(16);
-
   try {
     await account.execute({
       contractAddress: accountAddress,
       entrypoint: 'isValidSignature',
       calldata: [
-        typedDataHashHex, // hash
-        '2',              // length of signature array (two felts)
-        rHex,             // signature[0]
-        sHex,             // signature[1]
+        typedDataHashHex,
+        '2', // length of signature array
+        '0x' + r.toString(16),
+        '0x' + s.toString(16),
       ],
     });
     console.log('On-chain verification result = true');
@@ -348,27 +362,20 @@ In real-world projects, you’ll rely on the official EIP-712 hashing logic or `
 > Final Note: The differences between `secp256k1` (Ethereum) and Stark-friendly curves (Starknet) are behind the scenes. The higher-level signing steps and verification calls remain conceptually similar—only the library, hash function, and underlying prime field change. This is how Starknet combines the familiarity of ECDSA with the power of zero-knowledge-friendly cryptography.
 
 ## Conclusion
-While Ethereum and Starknet both use ECDSA to verify transactions, Starknet’s approach opens the door to more flexible and future-proof cryptography. Account abstraction, in particular, means you can upgrade your security model over time. Whether you’re signing with Starknet.js or starknet.py, the goal remains the same: ensure that only the rightful vault owner (private key holder) can sign a transaction.
+Both Ethereum and Starknet leverage ECDSA, but Starknet’s STARK-friendly curve and account abstraction make zero-knowledge proofs cheaper and more flexible. From a developer’s perspective, signing transactions might feel familiar—the differences lie in the choice of curve and hashing function.
 
-Remember our analogy: no one else can sneak into your vault or copy your keycard, and your unique signature (r, s) proves you’re the legitimate owner. As blockchain technology continues to evolve, Starknet’s specialized curve and account abstraction lay the groundwork for advanced authentication and quantum-safe cryptography—ensuring your digital vault remains secure for years to come.
+Feel free to explore the scripts in this repo to deepen your understanding:
+
+* Basic `signAndVerify.ts` for off-chain signature checks.
+* Advanced `signAndVerifyAdvanced.ts` for EIP-712-like typed data, plus on-chain validation.
+
+As blockchain evolves, Starknet’s architecture—particularly its specialized curve and account abstraction—lays the groundwork for advanced authentication methods and quantum-safe cryptography.
+
+Keep your private key safe, and happy coding!
 
 ## Further Reading
-
-Starknet.js Documentation
-starknet.py Documentation
-EIP-712 Specification
-SRC-6 Standard for Starknet
-
-To install dependencies:
-
-```bash
-bun install
-```
-
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.1.27. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+* [Starknet.js Documentation](https://www.starknetjs.com/docs/guides/intro/)
+* [starknet.py Documentation](https://starknetpy.readthedocs.com/en/latest/)
+* [EIP-712 Specification](https://eips.ethereum.org/EIPS/eip-712)
+* [SRC-6 (Starknet) Standard](https://github.com/starknet-io/SNIPs/blob/main/SNIPS/snip-6.md)
+* Bun: https://bun.sh/
